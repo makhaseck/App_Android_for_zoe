@@ -1,0 +1,184 @@
+import React, {useEffect, useState} from 'react';
+import {View, Text, TouchableHighlight, Switch, StyleSheet} from 'react-native';
+
+import {ros} from './robot';
+
+import * as goto from './component/fonction/Goto/goto'
+
+import {
+  accelerometer,
+  setUpdateIntervalForType,
+  SensorTypes,
+} from 'react-native-sensors';
+
+const App = () => {
+  setUpdateIntervalForType(SensorTypes.accelerometer, 1000);
+
+  
+  const [status, setStatus] = useState('Disconnected');
+  const [titlebutton, setTittlebutton] = useState('Connexion');
+  const [isEnabled, setIsEnabled] = useState(false);// ^?
+  const toggleSwitch = () => setIsEnabled(previousState => !previousState);
+  
+  const [x,setX] = useState();
+  const [y,setY] = useState();
+  const [z,setZ] = useState();
+  
+  const subscription = accelerometer.subscribe(({x, y, z, timestamp}) => {
+    setX(x);
+    setY(y);
+    setZ(z);
+  })
+
+  // Connect to the rosbridge server
+  const connection = () => {
+    ros.connect();
+    // Log a message when the connection is ok
+    ros.on('connection', function () {
+      console.log('Connected to websocket server.');
+      setStatus('Connected');
+      setTittlebutton('Deconnexion');
+    });
+
+    // Log a message when the connection is closed
+    ros.on('close', function () {
+      console.log('Connection to rosbridge closed.');
+      setStatus('Disconnected');
+      setTittlebutton('Connexion');
+    });
+
+    // Log a message when an error occurs
+    ros.on('error', function (error) {
+      console.log('Error connecting to rosbridge: ', error);
+      setStatus('Disconnected');
+      setTittlebutton('Connexion');
+    });
+  };
+
+
+  /**
+ * Fonction pour faire aller le robot dans une direction.
+ * @direction Premiere lettre du nom de la direction en anglais
+ * @param {string} direction premier lettre de la direction en anglais exemple : Left => L.
+ * @param {Float} xl lineaire x
+ * @param {Float} yl lineaire y
+ * @param {Float} zl lineaire z
+ * @param {Float} xa angular x
+ * @param {Float} ya angular y
+ * @param {Float} za angular z
+ */
+
+  const Goto = (direction,xl,yl,zl,xa,ya,za) =>{
+
+    var cmdVel = new ROSLIB.Topic({
+      ros: ros,
+      name: '/turtle1/cmd_vel',
+      messageType: 'geometry_msgs/Twist',
+    });
+
+    var twist = new ROSLIB.Message({
+      linear: {
+        x: xl,
+        y: yl,
+        z: zl,
+      },
+      angular: {
+        x: xa,
+        y: ya,
+        z: za,
+      },
+    });
+    cmdVel.publish(twist);
+    console.log(direction);
+  };
+  
+
+  const deconnection = () => {
+    ros.close();
+  };
+
+  if (isEnabled) {
+    if (y > 3) {
+      goto.GoRight();
+    } else if (y < -3) {
+      goto.GoLeft();
+    } else if (x < 5) {
+      goto.GoForward();
+    }
+  }
+
+  return (
+    <>
+      <View style={styles.ConnectButtons}>
+        <Text>Status: {status}</Text>
+
+        <Switch
+          trackColor={{false: '#767577', true: '#81b0ff'}}
+          thumbColor={isEnabled ? '#f5dd4b' : '#f4f3f4'}
+          ios_backgroundColor="#3e3e3e"
+          onValueChange={toggleSwitch}
+          value={isEnabled}
+        />
+
+        <TouchableHighlight
+          onPress={titlebutton === 'Connexion' ? connection : deconnection}>
+          <Text>{titlebutton}</Text>
+        </TouchableHighlight>
+      </View>
+      <View style={styles.Container}>
+        <TouchableHighlight onPress={Goto()} style={styles.FBbuttons}>
+          <Text>Forward</Text>
+        </TouchableHighlight>
+
+        <View style={styles.LRbuttons}>
+          <TouchableHighlight onPress={} style={styles.Lbutton}>
+            <Text>Left</Text>
+          </TouchableHighlight>
+
+          <TouchableHighlight onPress={} style={styles.Rbutton}>
+            <Text>Right</Text>
+          </TouchableHighlight>
+        </View>
+
+        <TouchableHighlight onPress={} style={styles.FBbuttons}>
+          <Text>Back</Text>
+        </TouchableHighlight>
+      </View>
+    </>
+  );
+};
+
+const styles = StyleSheet.create({
+  Container: {
+    flex: 1,
+    justifyContent: 'space-around',
+  },
+  ConnectButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  FBbuttons: {
+    alignItems: 'center',
+    backgroundColor: 'blue',
+    width: '20%',
+    marginHorizontal: '40%',
+  },
+  LRbuttons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginHorizontal: '20%',
+    width: '60%',
+  },
+  Lbutton: {
+    backgroundColor: 'blue',
+    width: '30%',
+    alignItems: 'center',
+  },
+  Rbutton: {
+    backgroundColor: 'blue',
+    width: '30%',
+    alignItems: 'center',
+  },
+});
+
+export default App;
